@@ -2,114 +2,106 @@
 <html lang="vi">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Stickman Warriors Online - Final</title>
-    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
-    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <title>STICKMAN WARRIORS ONLINE - FULL VERSION</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
     <style>
-        body { background: #050010; color: #00F7FF; font-family: 'Consolas', monospace; text-align: center; margin: 0; overflow-x: hidden; }
-        canvas { border: 2px solid #1A0033; background: #000; display: block; margin: 10px auto; box-shadow: 0 0 20px #1A0033; }
-        .ui-panel { background: rgba(16, 16, 48, 0.9); padding: 15px; border-top: 2px solid #00FFFF; position: fixed; bottom: 0; width: 100%; }
-        .btn { background: #101030; color: #00FFFF; border: 2px solid #00FFFF; padding: 12px 20px; cursor: pointer; margin: 5px; font-weight: bold; transition: 0.2s; }
+        body { background: #050010; color: #00F7FF; font-family: 'Consolas', monospace; text-align: center; margin: 0; }
+        #status-bar { display: flex; justify-content: space-around; padding: 15px; background: #1A0033; border-bottom: 2px solid #00FFFF; font-size: 1.2em; }
+        canvas { border: 3px solid #1A0033; background: #000; margin: 10px auto; display: block; box-shadow: 0 0 20px #00F7FF; }
+        .ui-panel { background: rgba(16, 16, 48, 0.95); padding: 20px; position: fixed; bottom: 0; width: 100%; border-top: 2px solid #00FFFF; }
+        .btn { background: #101030; color: #00FFFF; border: 2px solid #00FFFF; padding: 12px 25px; cursor: pointer; margin: 5px; font-weight: bold; transition: 0.2s; }
         .btn:hover { background: #00FFFF; color: #000; box-shadow: 0 0 15px #00FFFF; }
-        #status-bar { display: flex; justify-content: space-around; font-size: 1.2em; padding: 15px; background: #1A0033; border-bottom: 1px solid #00FFFF; }
-        .hp-bar { color: #FF0055; font-weight: bold; }
+        .btn:disabled { border-color: #555; color: #555; cursor: not-allowed; }
+        #log-box { color: #FFD700; height: 30px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <div id="status-bar">
-        <div id="p-info">PLAYER: 500 HP</div>
-        <div id="msg-box" style="color: #FFD700;">ĐANG KHỞI TẠO HỆ THỐNG...</div>
-        <div id="e-info" class="hp-bar">BOSS: 500 HP</div>
+        <div id="p-info">PLAYER: 500 HP | Vàng: 500</div>
+        <div id="e-info" style="color: #FF0055;">BOSS: 500 HP | LV: 1</div>
     </div>
 
     <canvas id="gameCanvas" width="1100" height="450"></canvas>
 
     <div class="ui-panel">
+        <div id="log-box">ĐANG KHỞI TẠO AI VÀ HỆ THỐNG CHIẾN ĐẤU...</div>
         <div id="skill-buttons"></div>
-        <div style="margin-top: 10px; font-size: 0.9em; color: #888;">
-            Dữ liệu được nạp trực tiếp từ stickman.py
-        </div>
     </div>
 
-    <script type="py">
-import js
-from pyscript import display, when, window
-import random
+    <script type="text/javascript">
+        async function main() {
+            let pyodide = await loadPyodide();
+            await pyodide.runPythonAsync(`
+                import random
+                
+                # --- BE NGUYÊN LOGIC GAME_CONFIG CỦA BẠN VÀO ĐÂY ---
+                GAME_CONFIG = {
+                    'skills': {
+                        'dam_nhe': {'name': "Đấm Thường", 'dmg': (25, 40), 'limit': 999},
+                        'kame': {'name': "KAMEHAMEHA", 'dmg': (70, 100), 'limit': 3},
+                        'genki': {'name': "Quả Cầu Kênh Khi", 'dmg': (150, 200), 'limit': 1},
+                        'teleport': {'name': "Dịch Chuyển", 'dmg': (50, 70), 'limit': 5}
+                    }
+                }
 
-# Giả lập các thư viện không có trên web để tránh lỗi crash
-import sys
-from unittest.mock import MagicMock
-sys.modules['tkinter'] = MagicMock()
-sys.modules['tkinter.messagebox'] = MagicMock()
+                p_hp = 500
+                e_hp = 500
+                p_lim = {k: v['limit'] for k, v in GAME_CONFIG['skills'].items()}
 
-# Nạp GAME_CONFIG từ file stickman.py (Giả lập lại cấu hình của bạn)
-GAME_CONFIG = {
-    'skills': {
-        'dam_nhe': {'name': "Đấm Thường", 'dmg': (25, 40)},
-        'kame': {'name': "KAMEHAMEHA", 'dmg': (70, 100)},
-        'genki': {'name': "Quả Cầu Kênh Khi", 'dmg': (150, 200)},
-        'teleport': {'name': "Dịch Chuyển", 'dmg': (50, 70)}
-    }
-}
+                def calculate_damage(skill_id):
+                    return random.randint(*GAME_CONFIG['skills'][skill_id]['dmg'])
+            `);
 
-p_hp = 500
-e_hp = 500
-canvas = window.document.getElementById("gameCanvas")
-ctx = canvas.getContext("2d")
+            const canvas = document.getElementById("gameCanvas");
+            const ctx = canvas.getContext("2d");
 
-def draw_stickman(x, y, color, pose="idle"):
-    ctx.strokeStyle = color
-    ctx.lineWidth = 4
-    # Vẽ đầu
-    ctx.beginPath(); ctx.arc(x, y-70, 25, 0, 6.28); ctx.stroke()
-    # Vẽ thân
-    ctx.beginPath(); ctx.moveTo(x, y-45); ctx.lineTo(x, y+30); ctx.stroke()
-    # Vẽ tay chân
-    if pose == "atk":
-        ctx.beginPath(); ctx.moveTo(x, y-20); ctx.lineTo(x+40, y-10); ctx.stroke()
-    else:
-        ctx.beginPath(); ctx.moveTo(x, y-20); ctx.lineTo(x-30, y+10); ctx.moveTo(x, y-20); ctx.lineTo(x+30, y+10); ctx.stroke()
-    ctx.beginPath(); ctx.moveTo(x, y+30); ctx.lineTo(x-20, y+80); ctx.moveTo(x, y+30); ctx.lineTo(x+20, y+80); ctx.stroke()
+            function drawStickman(x, y, color, pose="idle") {
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 4;
+                ctx.beginPath(); ctx.arc(x, y-70, 25, 0, Math.PI*2); ctx.stroke(); // Đầu
+                ctx.beginPath(); ctx.moveTo(x, y-45); ctx.lineTo(x, y+30); ctx.stroke(); // Thân
+                if(pose === "atk") {
+                    ctx.beginPath(); ctx.moveTo(x, y-20); ctx.lineTo(x+50, y-10); ctx.stroke(); // Tay đấm
+                }
+                ctx.beginPath(); ctx.moveTo(x, y+30); ctx.lineTo(x-20, y+80); 
+                ctx.moveTo(x, y+30); ctx.lineTo(x+20, y+80); ctx.stroke(); // Chân
+            }
 
-def update_ui():
-    ctx.clearRect(0, 0, 1100, 500)
-    # Vẽ các vì sao
-    ctx.fillStyle = "white"
-    for _ in range(30): ctx.fillRect(random.randint(0, 1100), random.randint(0, 450), 2, 2)
-    # Vẽ nhân vật
-    draw_stickman(250, 320, "#00F7FF") # Player
-    draw_stickman(850, 320, "#FF0055") # Boss
-    window.document.getElementById("p-info").innerHTML = f"PLAYER: {p_hp} HP"
-    window.document.getElementById("e-info").innerHTML = f"BOSS: {e_hp} HP"
+            function updateUI() {
+                ctx.clearRect(0, 0, 1100, 450);
+                drawStickman(250, 320, "#00F7FF");
+                drawStickman(850, 320, "#FF0055");
+                document.getElementById("p-info").innerHTML = \`PLAYER: \${pyodide.globals.get("p_hp")} HP\`;
+                document.getElementById("e-info").innerHTML = \`BOSS: \${pyodide.globals.get("e_hp")} HP\`;
+            }
 
-@when("click", ".btn-skill")
-def player_attack(event):
-    global e_hp, p_hp
-    skill_id = event.target.id
-    dmg_range = GAME_CONFIG['skills'][skill_id]['dmg']
-    dmg = random.randint(*dmg_range)
-    e_hp -= dmg
-    
-    # AI Phản công đơn giản
-    ai_dmg = random.randint(20, 45)
-    p_hp -= ai_dmg
-    
-    window.document.getElementById("msg-box").innerHTML = f"BẠN GÂY {dmg} DMG! BOSS PHẢN ĐÒN {ai_dmg} DMG!"
-    update_ui()
-    if e_hp <= 0: window.alert("BẠN ĐÃ CHIẾN THẮNG BOSS!"); location.reload()
+            window.attack = (skillId) => {
+                let dmg = pyodide.runPython(\`calculate_damage("\${skillId}")\`);
+                let e_hp = pyodide.globals.get("e_hp") - dmg;
+                pyodide.globals.set("e_hp", e_hp);
+                
+                let ai_dmg = Math.floor(Math.random() * 30) + 10;
+                let p_hp = pyodide.globals.get("p_hp") - ai_dmg;
+                pyodide.globals.set("p_hp", p_hp);
 
-# Tạo nút bấm từ GAME_CONFIG
-btn_area = window.document.getElementById("skill-buttons")
-for sid, info in GAME_CONFIG['skills'].items():
-    btn = window.document.createElement("button")
-    btn.className = "btn btn-skill"
-    btn.id = sid
-    btn.innerHTML = info['name']
-    btn_area.appendChild(btn)
+                document.getElementById("log-box").innerHTML = \`Bạn dùng \${skillId} gây \${dmg} sát thương! Boss đánh trả \${ai_dmg}!\`;
+                updateUI();
+                if(e_hp <= 0) alert("BẠN THẮNG!");
+            };
 
-update_ui()
-window.document.getElementById("msg-box").innerHTML = "HỆ THỐNG SẴN SÀNG! CHIẾN ĐI!"
+            const btnArea = document.getElementById("skill-buttons");
+            ["dam_nhe", "kame", "genki", "teleport"].forEach(id => {
+                const btn = document.createElement("button");
+                btn.className = "btn";
+                btn.innerHTML = id.toUpperCase();
+                btn.onclick = () => window.attack(id);
+                btnArea.appendChild(btn);
+            });
+
+            updateUI();
+            document.getElementById("log-box").innerHTML = "HỆ THỐNG SẴN SÀNG! CHIẾN ĐI!";
+        }
+        main();
     </script>
 </body>
 </html>
