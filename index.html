@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Stickman Online</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <style>
+        body { background: #050010; color: #00F7FF; font-family: 'Consolas', monospace; text-align: center; padding-top: 50px; }
+        #game-board { border: 2px solid #1A0033; background: #000; width: 600px; height: 400px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+        .btn { background: #101030; color: #00FFFF; border: 2px solid #00FFFF; padding: 10px 20px; cursor: pointer; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>STICKMAN WARRIORS ONLINE</h1>
+    <div id="game-board">Đang tải Python 3.14...</div>
+    <button id="atk-btn" class="btn">TUNG CHIÊU KAMEHAMEHA</button>
+
+    <script type="py">
+        from pyscript import display, when
+        import random
+
+        # Logic chiến đấu đơn giản từ code của bạn
+        @when("click", "#atk-btn")
+        def attack(event):
+            dmg = random.randint(70, 100)
+            display(f"BẠN TUNG KAMEHAMEHA! Gây {dmg} sát thương!", target="game-board", append=False)
+
+        display("SẴN SÀNG CHIẾN ĐẤU!", target="game-board", append=False)
+    </script>
+</body>
+</html>
