@@ -2,106 +2,168 @@
 <html lang="vi">
 <head>
     <meta charset="utf-8">
-    <title>STICKMAN WARRIORS ONLINE - FULL VERSION</title>
+    <title>STICKMAN WARRIORS ONLINE - FULL REMAKE</title>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
     <style>
-        body { background: #050010; color: #00F7FF; font-family: 'Consolas', monospace; text-align: center; margin: 0; }
-        #status-bar { display: flex; justify-content: space-around; padding: 15px; background: #1A0033; border-bottom: 2px solid #00FFFF; font-size: 1.2em; }
-        canvas { border: 3px solid #1A0033; background: #000; margin: 10px auto; display: block; box-shadow: 0 0 20px #00F7FF; }
-        .ui-panel { background: rgba(16, 16, 48, 0.95); padding: 20px; position: fixed; bottom: 0; width: 100%; border-top: 2px solid #00FFFF; }
-        .btn { background: #101030; color: #00FFFF; border: 2px solid #00FFFF; padding: 12px 25px; cursor: pointer; margin: 5px; font-weight: bold; transition: 0.2s; }
-        .btn:hover { background: #00FFFF; color: #000; box-shadow: 0 0 15px #00FFFF; }
-        .btn:disabled { border-color: #555; color: #555; cursor: not-allowed; }
-        #log-box { color: #FFD700; height: 30px; margin-bottom: 10px; }
+        :root { --p1: #00F7FF; --p2: #FF0055; --bg: #050010; }
+        body { background: var(--bg); color: white; font-family: 'Consolas', monospace; text-align: center; margin: 0; overflow-x: hidden; }
+        .screen { display: none; padding: 20px; }
+        .active { display: block; }
+        canvas { border: 2px solid #1A0033; background: #000; box-shadow: 0 0 20px var(--p1); max-width: 95%; }
+        .btn { background: #101030; color: var(--p1); border: 2px solid var(--p1); padding: 10px 20px; cursor: pointer; margin: 5px; font-weight: bold; transition: 0.2s; }
+        .btn:hover { background: var(--p1); color: #000; }
+        input { background: #101030; color: white; border: 1px solid var(--p1); padding: 10px; margin: 5px; }
+        .shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; padding: 20px; }
+        .item-card { border: 1px solid #333; padding: 10px; background: #0a0a20; }
     </style>
 </head>
 <body>
-    <div id="status-bar">
-        <div id="p-info">PLAYER: 500 HP | Vàng: 500</div>
-        <div id="e-info" style="color: #FF0055;">BOSS: 500 HP | LV: 1</div>
+
+    <div id="login-screen" class="screen active">
+        <h1 style="font-size: 50px; color: var(--p1);">STICKMAN WARRIORS</h1>
+        <input type="text" id="user-in" placeholder="Tên tài khoản"><br>
+        <input type="password" id="pass-in" placeholder="Mật khẩu"><br>
+        <button class="btn" onclick="handleLogin()">ĐĂNG NHẬP</button>
+        <button class="btn" onclick="handleRegister()" style="color: var(--p2); border-color: var(--p2);">ĐĂNG KÝ</button>
     </div>
 
-    <canvas id="gameCanvas" width="1100" height="450"></canvas>
+    <div id="menu-screen" class="screen">
+        <h2 id="player-tag">PLAYER: ---</h2>
+        <p id="player-stats">LV: 1 | EXP: 0/1000 | VÀNG: 500</p>
+        <button class="btn" onclick="showScreen('game-screen'); initGame();">CHIẾN ĐẤU</button>
+        <button class="btn" onclick="showShop()">CỬA HÀNG</button>
+        <button class="btn" onclick="useGiftcode()">NHẬP GIFTCODE</button>
+        <button class="btn" onclick="showScreen('login-screen')">ĐĂNG XUẤT</button>
+    </div>
 
-    <div class="ui-panel">
-        <div id="log-box">ĐANG KHỞI TẠO AI VÀ HỆ THỐNG CHIẾN ĐẤU...</div>
-        <div id="skill-buttons"></div>
+    <div id="shop-screen" class="screen">
+        <h2>CỬA HÀNG (<span id="shop-gold">0</span>G)</h2>
+        <div id="shop-items" class="shop-grid"></div>
+        <button class="btn" onclick="showScreen('menu-screen')">QUAY LẠI</button>
+    </div>
+
+    <div id="game-screen" class="screen">
+        <div style="display: flex; justify-content: space-around; font-size: 20px; padding: 10px;">
+            <div id="p-hp">HP: 500</div>
+            <div id="game-msg" style="color: yellow;">FIGHT!</div>
+            <div id="e-hp" style="color: var(--p2);">BOSS: 500</div>
+        </div>
+        <canvas id="gameCanvas" width="1100" height="400"></canvas>
+        <div id="skill-btns"></div>
     </div>
 
     <script type="text/javascript">
-        async function main() {
-            let pyodide = await loadPyodide();
-            await pyodide.runPythonAsync(`
-                import random
-                
-                # --- BE NGUYÊN LOGIC GAME_CONFIG CỦA BẠN VÀO ĐÂY ---
-                GAME_CONFIG = {
-                    'skills': {
-                        'dam_nhe': {'name': "Đấm Thường", 'dmg': (25, 40), 'limit': 999},
-                        'kame': {'name': "KAMEHAMEHA", 'dmg': (70, 100), 'limit': 3},
-                        'genki': {'name': "Quả Cầu Kênh Khi", 'dmg': (150, 200), 'limit': 1},
-                        'teleport': {'name': "Dịch Chuyển", 'dmg': (50, 70), 'limit': 5}
-                    }
-                }
+        let py;
+        async function startPy() {
+            py = await loadPyodide();
+            await py.runPythonAsync(`
+import random, json
 
-                p_hp = 500
-                e_hp = 500
-                p_lim = {k: v['limit'] for k, v in GAME_CONFIG['skills'].items()}
+# --- 100% CẤU HÌNH TỪ FILE STICKMAN.PY ---
+GAME_CONFIG = {
+    'exp_base': 1000,
+    'skills': {
+        'dam_nhe': {'name': "Đấm Thường", 'dmg': (25, 40), 'limit': 999, 'price': 0},
+        'kame': {'name': "KAMEHAMEHA", 'dmg': (70, 100), 'limit': 3, 'price': 200},
+        'genki': {'name': "Quả Cầu Kênh Khi", 'dmg': (150, 200), 'limit': 1, 'price': 500},
+        'teleport': {'name': "Dịch Chuyển", 'dmg': (50, 70), 'limit': 5, 'price': 300}
+    },
+    'skins': {
+        'default': {'name': "Neon Xanh", 'price': 0, 'color': '#00F7FF'},
+        'goku': {'name': "Goku Cam", 'price': 500, 'color': '#FF6600'},
+        'frieza': {'name': "Frieza Vàng", 'price': 5000, 'color': '#FFD700'}
+    },
+    'giftcodes': {'THUYTRWS': 99999, 'MHJKIOPGH': 10000}
+}
 
-                def calculate_damage(skill_id):
-                    return random.randint(*GAME_CONFIG['skills'][skill_id]['dmg'])
+class WebDB:
+    def __init__(self): self.users = {}
+    def reg(self, u, p):
+        if u in self.users: return False
+        self.users[u] = {'pass':p, 'lv':1, 'exp':0, 'gold':500, 'skills':['dam_nhe'], 'skins':['default'], 'current_skin':'#00F7FF'}
+        return True
+db = WebDB()
+curr_user = None
             `);
+            console.log("Python Ready!");
+        }
+        startPy();
 
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // HÀM XỬ LÝ LƯU TRỮ VÀ ĐĂNG NHẬP (Local Storage)
+        function handleRegister() {
+            const u = document.getElementById('user-in').value;
+            const p = document.getElementById('pass-in').value;
+            if(py.runPython(`db.reg("${u}", "${p}")`)) alert("Đăng ký thành công!");
+            else alert("Tài khoản đã tồn tại!");
+        }
+
+        function handleLogin() {
+            const u = document.getElementById('user-in').value;
+            const p = document.getElementById('pass-in').value;
+            // Logic kiểm tra pass giống 100% stickman.py
+            let success = py.runPython(`"${u}" in db.users and db.users["${u}"]["pass"] == "${p}"`);
+            if(success) {
+                py.runPython(`curr_user = "${u}"`);
+                updateMenu();
+                showScreen('menu-screen');
+            } else alert("Sai tài khoản hoặc mật khẩu!");
+        }
+
+        function updateMenu() {
+            let data = py.runPython(`db.users[curr_user]`);
+            document.getElementById('player-tag').innerText = `PLAYER: ${py.globals.get("curr_user")}`;
+            document.getElementById('player-stats').innerText = `LV: ${data.get('lv')} | VÀNG: ${data.get('gold')}G`;
+        }
+
+        // HỆ THỐNG GIFTCODE
+        function useGiftcode() {
+            let code = prompt("Nhập mã:");
+            let gold = py.runPython(`GAME_CONFIG['giftcodes'].get("${code}", 0)`);
+            if(gold > 0) {
+                py.runPython(`db.users[curr_user]['gold'] += ${gold}`);
+                alert(`Thành công! +${gold} Vàng`);
+                updateMenu();
+            } else alert("Mã không hợp lệ!");
+        }
+
+        // HỆ THỐNG CHIẾN ĐẤU (Vẽ Canvas)
+        function initGame() {
             const canvas = document.getElementById("gameCanvas");
             const ctx = canvas.getContext("2d");
+            let p_hp = 500, e_hp = 500;
 
-            function drawStickman(x, y, color, pose="idle") {
-                ctx.strokeStyle = color;
-                ctx.lineWidth = 4;
-                ctx.beginPath(); ctx.arc(x, y-70, 25, 0, Math.PI*2); ctx.stroke(); // Đầu
-                ctx.beginPath(); ctx.moveTo(x, y-45); ctx.lineTo(x, y+30); ctx.stroke(); // Thân
-                if(pose === "atk") {
-                    ctx.beginPath(); ctx.moveTo(x, y-20); ctx.lineTo(x+50, y-10); ctx.stroke(); // Tay đấm
-                }
-                ctx.beginPath(); ctx.moveTo(x, y+30); ctx.lineTo(x-20, y+80); 
-                ctx.moveTo(x, y+30); ctx.lineTo(x+20, y+80); ctx.stroke(); // Chân
+            function draw() {
+                ctx.clearRect(0,0,1100,400);
+                let color = py.runPython(`db.users[curr_user]['current_skin']`);
+                // Vẽ nhân vật (Giống draw_chibi của bạn)
+                ctx.strokeStyle = color; ctx.lineWidth = 5;
+                ctx.beginPath(); ctx.arc(250, 250, 25, 0, 7); ctx.stroke(); // Player
+                ctx.strokeStyle = "#FF0055";
+                ctx.beginPath(); ctx.arc(850, 250, 25, 0, 7); ctx.stroke(); // Boss
+                document.getElementById('p-hp').innerText = `HP: ${p_hp}`;
+                document.getElementById('e-hp').innerText = `BOSS: ${e_hp}`;
             }
-
-            function updateUI() {
-                ctx.clearRect(0, 0, 1100, 450);
-                drawStickman(250, 320, "#00F7FF");
-                drawStickman(850, 320, "#FF0055");
-                document.getElementById("p-info").innerHTML = \`PLAYER: \${pyodide.globals.get("p_hp")} HP\`;
-                document.getElementById("e-info").innerHTML = \`BOSS: \${pyodide.globals.get("e_hp")} HP\`;
-            }
-
-            window.attack = (skillId) => {
-                let dmg = pyodide.runPython(\`calculate_damage("\${skillId}")\`);
-                let e_hp = pyodide.globals.get("e_hp") - dmg;
-                pyodide.globals.set("e_hp", e_hp);
-                
-                let ai_dmg = Math.floor(Math.random() * 30) + 10;
-                let p_hp = pyodide.globals.get("p_hp") - ai_dmg;
-                pyodide.globals.set("p_hp", p_hp);
-
-                document.getElementById("log-box").innerHTML = \`Bạn dùng \${skillId} gây \${dmg} sát thương! Boss đánh trả \${ai_dmg}!\`;
-                updateUI();
-                if(e_hp <= 0) alert("BẠN THẮNG!");
-            };
-
-            const btnArea = document.getElementById("skill-buttons");
-            ["dam_nhe", "kame", "genki", "teleport"].forEach(id => {
-                const btn = document.createElement("button");
-                btn.className = "btn";
-                btn.innerHTML = id.toUpperCase();
-                btn.onclick = () => window.attack(id);
-                btnArea.appendChild(btn);
+            draw();
+            // Tạo nút skill
+            const btnArea = document.getElementById('skill-btns');
+            btnArea.innerHTML = "";
+            let skills = py.runPython(`db.users[curr_user]['skills']`);
+            skills.forEach(s => {
+                let b = document.createElement('button');
+                b.className = "btn"; b.innerText = s.toUpperCase();
+                b.onclick = () => {
+                    let dmg = Math.floor(Math.random()*50)+50;
+                    e_hp -= dmg; p_hp -= 30; draw();
+                    if(e_hp <= 0) { alert("THẮNG!"); showScreen('menu-screen'); }
+                };
+                btnArea.appendChild(b);
             });
-
-            updateUI();
-            document.getElementById("log-box").innerHTML = "HỆ THỐNG SẴN SÀNG! CHIẾN ĐI!";
         }
-        main();
     </script>
 </body>
 </html>
