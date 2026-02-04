@@ -2,32 +2,81 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Stickman Online</title>
+    <title>Stickman Warriors Online</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <style>
-        body { background: #050010; color: #00F7FF; font-family: 'Consolas', monospace; text-align: center; padding-top: 50px; }
-        #game-board { border: 2px solid #1A0033; background: #000; width: 600px; height: 400px; margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 24px; }
-        .btn { background: #101030; color: #00FFFF; border: 2px solid #00FFFF; padding: 10px 20px; cursor: pointer; margin-top: 20px; }
+        body { background: #050010; color: #00F7FF; font-family: 'Consolas', monospace; text-align: center; }
+        canvas { border: 2px solid #1A0033; background: #000; margin: 20px auto; display: block; }
+        .controls { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+        .btn { background: #101030; color: #00FFFF; border: 2px solid #00FFFF; padding: 10px 15px; cursor: pointer; }
     </style>
 </head>
 <body>
     <h1>STICKMAN WARRIORS ONLINE</h1>
-    <div id="game-board">Đang tải Python 3.14...</div>
-    <button id="atk-btn" class="btn">TUNG CHIÊU KAMEHAMEHA</button>
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="status">Đang khởi tạo nhân vật...</div>
+    <div class="controls" id="buttons"></div>
 
     <script type="py">
-        from pyscript import display, when
+        from pyscript import display, when, window
         import random
 
-        # Logic chiến đấu đơn giản từ code của bạn
-        @when("click", "#atk-btn")
-        def attack(event):
-            dmg = random.randint(70, 100)
-            display(f"BẠN TUNG KAMEHAMEHA! Gây {dmg} sát thương!", target="game-board", append=False)
+        # Lấy Canvas để vẽ (Thay thế tkinter Canvas)
+        canvas = window.document.getElementById("gameCanvas")
+        ctx = canvas.getContext("2d")
 
-        display("SẴN SÀNG CHIẾN ĐẤU!", target="game-board", append=False)
+        # --- COPY LOGIC TỪ FILE STICKMAN.PY CỦA BẠN ---
+        # (Mình lấy ví dụ các thông số quan trọng)
+        SKILLS = {
+            'kame': {'name': "KAMEHAMEHA", 'dmg': (70, 100), 'color': "yellow"},
+            'dam': {'name': "ĐẤM THƯỜNG", 'dmg': (25, 40), 'color': "white"}
+        }
+
+        p_hp = 500
+        e_hp = 500
+
+        def draw_stickman(x, y, color, is_enemy=False):
+            ctx.strokeStyle = color
+            ctx.lineWidth = 3
+            # Vẽ đầu
+            ctx.beginPath()
+            ctx.arc(x, y-60, 20, 0, 6.28)
+            ctx.stroke()
+            # Vẽ thân
+            ctx.beginPath()
+            ctx.moveTo(x, y-40)
+            ctx.lineTo(x, y+20)
+            ctx.stroke()
+            # Vẽ tay chân đơn giản
+            ctx.moveTo(x, y-20); ctx.lineTo(x-20, y); ctx.moveTo(x, y-20); ctx.lineTo(x+20, y)
+            ctx.moveTo(x, y+20); ctx.lineTo(x-20, y+60); ctx.moveTo(x, y+20); ctx.lineTo(x+20, y+60)
+            ctx.stroke()
+
+        def update_screen():
+            ctx.clearRect(0, 0, 800, 400)
+            draw_stickman(200, 300, "#00F7FF") # Player
+            draw_stickman(600, 300, "#FF0055", True) # Enemy
+            window.document.getElementById("status").innerHTML = f"PLAYER: {p_hp} HP | BOSS: {e_hp} HP"
+
+        @when("click", ".btn")
+        def fight(event):
+            global e_hp, p_hp
+            dmg = random.randint(70, 100)
+            e_hp -= dmg
+            p_hp -= random.randint(20, 40)
+            update_screen()
+            if e_hp <= 0: window.alert("BẠN THẮNG!")
+
+        # Tạo nút bấm tự động từ SKILLS
+        btn_div = window.document.getElementById("buttons")
+        for s_id, s_info in SKILLS.items():
+            new_btn = window.document.createElement("button")
+            new_btn.innerHTML = s_info['name']
+            new_btn.className = "btn"
+            btn_div.appendChild(new_btn)
+
+        update_screen()
     </script>
 </body>
 </html>
